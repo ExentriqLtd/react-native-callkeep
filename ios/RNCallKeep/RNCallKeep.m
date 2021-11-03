@@ -676,7 +676,7 @@ RCT_EXPORT_METHOD(getAudioRoutes: (RCTPromiseResolveBlock)resolve
             }
         }
         // timeout incomingCall
-        [NSTimer scheduledTimerWithTimeInterval:60.0
+        [NSTimer scheduledTimerWithTimeInterval:40.0
              target:callKeep
              selector:@selector(timeoutIncomingCall)
              userInfo:nil
@@ -694,7 +694,7 @@ RCT_EXPORT_METHOD(getAudioRoutes: (RCTPromiseResolveBlock)resolve
     NSLog(@"Will appear after a 10 second delay %@", uuidstring);
     BOOL isActive = [RNCallKeep isCallActive: uuidstring];
     if (!isActive) {
-        [sharedProvider reportCallWithUUID:uuid endedAtDate:[NSDate date] reason:CXCallEndedReasonAnsweredElsewhere];
+        [sharedProvider reportCallWithUUID:uuid endedAtDate:[NSDate date] reason:CXCallEndedReasonUnanswered];
     }
 }
 
