@@ -697,7 +697,6 @@ RCT_EXPORT_METHOD(getAudioRoutes: (RCTPromiseResolveBlock)resolve
         [sharedProvider reportCallWithUUID:uuid endedAtDate:[NSDate date] reason:CXCallEndedReasonAnsweredElsewhere];
     }
 }
-}
 
 - (BOOL)lessThanIos10_2
 {
