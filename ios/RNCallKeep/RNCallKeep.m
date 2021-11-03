@@ -42,7 +42,9 @@ static NSString *const RNCallKeepDidLoadWithEvents = @"RNCallKeepDidLoadWithEven
     BOOL _isStartCallActionEventListenerAdded;
     bool _hasListeners;
     NSMutableArray *_delayedEvents;
-} 
+    NSUUID *uuid;
+}
+@synthesize uuid;
 
 static bool isSetupNatively;
 static CXProvider* sharedProvider;
@@ -398,8 +400,8 @@ RCT_EXPORT_METHOD(getCalls:(RCTPromiseResolveBlock)resolve
     resolve([RNCallKeep getCalls]);
 }
 
-RCT_EXPORT_METHOD(setAudioRoute: (NSString *)uuid 
-                inputName:(NSString *)inputName 
+RCT_EXPORT_METHOD(setAudioRoute: (NSString *)uuid
+                inputName:(NSString *)inputName
                 resolver:(RCTPromiseResolveBlock)resolve
                 rejecter:(RCTPromiseRejectBlock)reject)
 {
@@ -417,7 +419,7 @@ RCT_EXPORT_METHOD(setAudioRoute: (NSString *)uuid
             resolve(@"Speaker");
             return;
         }
-        
+
         NSArray *ports = [RNCallKeep getAudioInputs];
         for (AVAudioSessionPortDescription *port in ports) {
             if ([port.portName isEqualToString:inputName]) {
@@ -456,12 +458,12 @@ RCT_EXPORT_METHOD(getAudioRoutes: (RCTPromiseResolveBlock)resolve
 + (NSMutableArray *) formatAudioInputs: (NSMutableArray *)inputs
 {
     NSMutableArray *newInputs = [NSMutableArray new];
-    
+
     NSMutableDictionary *speakerDict = [[NSMutableDictionary alloc]init];
     [speakerDict setObject:@"Speaker" forKey:@"name"];
     [speakerDict setObject:AVAudioSessionPortBuiltInSpeaker forKey:@"type"];
     [newInputs addObject:speakerDict];
-    
+
     for (AVAudioSessionPortDescription* input in inputs)
     {
         NSString *str = [NSString stringWithFormat:@"PORTS :\"%@\": UID:%@", input.portName, input.UID ];
@@ -653,6 +655,7 @@ RCT_EXPORT_METHOD(getAudioRoutes: (RCTPromiseResolveBlock)resolve
     [RNCallKeep initCallKitProvider];
     [sharedProvider reportNewIncomingCallWithUUID:uuid update:callUpdate completion:^(NSError * _Nullable error) {
         RNCallKeep *callKeep = [RNCallKeep allocWithZone: nil];
+        [callKeep setUuid:uuid];
         [callKeep sendEventWithNameWrapper:RNCallKeepDidDisplayIncomingCall body:@{
             @"error": error && error.localizedDescription ? error.localizedDescription : @"",
             @"callUUID": uuidString,
@@ -672,10 +675,28 @@ RCT_EXPORT_METHOD(getAudioRoutes: (RCTPromiseResolveBlock)resolve
                 [callKeep configureAudioSession];
             }
         }
+        // timeout incomingCall
+        [NSTimer scheduledTimerWithTimeInterval:60.0
+             target:callKeep
+             selector:@selector(timeoutIncomingCall)
+             userInfo:nil
+             repeats:NO];
         if (completion != nil) {
             completion();
         }
     }];
+}
+- (void) timeoutIncomingCall
+{
+    NSUUID *uuid = [self uuid];
+    NSString *uuidstring = [uuid UUIDString];
+
+    NSLog(@"Will appear after a 10 second delay %@", uuidstring);
+    BOOL isActive = [RNCallKeep isCallActive: uuidstring];
+    if (!isActive) {
+        [sharedProvider reportCallWithUUID:uuid endedAtDate:[NSDate date] reason:CXCallEndedReasonAnsweredElsewhere];
+    }
+}
 }
 
 - (BOOL)lessThanIos10_2
