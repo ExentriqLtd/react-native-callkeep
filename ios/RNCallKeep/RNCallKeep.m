@@ -931,6 +931,37 @@ RCT_EXPORT_METHOD(reportUpdatedCall:(NSString *)uuidString contactIdentifier:(NS
 #endif
     [self sendEventWithNameWrapper:RNCallKeepPerformEndCallAction body:@{ @"callUUID": [action.callUUID.UUIDString lowercaseString] }];
     [action fulfill];
+
+    // Create the request.
+    NSError *error = nil;
+    NSUserDefaults *userDefaults = [NSUserDefaults standardUserDefaults];
+    NSString *userId = [userDefaults objectForKey:@"userId"];
+    NSString *rejectMeetInviteUrl = [userDefaults objectForKey:@"rejectMeetInviteUrl"];
+#ifdef DEBUG
+    NSLog(@"URL:::: %@", rejectMeetInviteUrl);
+    NSLog(@"URL:::: %@", userId);
+#endif
+    NSMutableURLRequest *request = [NSMutableURLRequest requestWithURL:[NSURL URLWithString: rejectMeetInviteUrl]];
+
+    // Specify that it will be a POST request
+    request.HTTPMethod = @"POST";
+
+    // Setting a timeout
+    request.timeoutInterval = 20.0;
+    // This is how we set header fields
+    [request setValue:@"application/json; charset=utf-8" forHTTPHeaderField:@"Content-Type"];
+
+    NSDictionary *postDict = @{@"userId":userId, @"uuid": [action.callUUID.UUIDString lowercaseString]};
+    NSData *postData = [NSJSONSerialization dataWithJSONObject:postDict options:kNilOptions error:&error];
+    request.HTTPBody = postData;
+
+    // Create url connection and fire request
+    NSURLResponse * response = nil;
+    NSURLConnection *conn = [[NSURLConnection alloc] initWithRequest:request delegate:self];
+    [NSURLConnection sendSynchronousRequest:request returningResponse:&response error:&error];
+    if (error != nil) {
+      NSLog(@"errore: %@", error);
+    }
 }
 
 -(void)provider:(CXProvider *)provider performSetHeldCallAction:(CXSetHeldCallAction *)action
