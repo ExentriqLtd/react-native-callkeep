@@ -158,7 +158,9 @@ RCT_EXPORT_METHOD(setup:(NSDictionary *)options)
     NSLog(@"[RNCallKeep][setup] options = %@", options);
 #endif
     _version = [[[NSProcessInfo alloc] init] operatingSystemVersion];
-    self.callKeepCallController = [[CXCallController alloc] init];
+    if (self.callKeepCallController == nil) {
+        self.callKeepCallController = [[CXCallController alloc] init];
+    }
     NSDictionary *settings = [[NSMutableDictionary alloc] initWithDictionary:options];
     // Store settings in NSUserDefault
     [[NSUserDefaults standardUserDefaults] setObject:settings forKey:@"RNCallKeepSettings"];
@@ -254,6 +256,7 @@ RCT_EXPORT_METHOD(answerIncomingCall:(NSString *)uuidString)
     NSLog(@"[RNCallKeep][answerIncomingCall] uuidString = %@", uuidString);
 #endif
     NSUUID *uuid = [[NSUUID alloc] initWithUUIDString:uuidString];
+
     CXAnswerCallAction *answerCallAction = [[CXAnswerCallAction alloc] initWithCallUUID:uuid];
     CXTransaction *transaction = [[CXTransaction alloc] init];
     [transaction addAction:answerCallAction];
@@ -919,6 +922,7 @@ RCT_EXPORT_METHOD(reportUpdatedCall:(NSString *)uuidString contactIdentifier:(NS
     NSLog(@"[RNCallKeep][CXProviderDelegate][provider:performAnswerCallAction]");
 #endif
     [self configureAudioSession];
+
     [self sendEventWithNameWrapper:RNCallKeepPerformAnswerCallAction body:@{ @"callUUID": [action.callUUID.UUIDString lowercaseString] }];
     [action fulfill];
 }
@@ -940,6 +944,7 @@ RCT_EXPORT_METHOD(reportUpdatedCall:(NSString *)uuidString contactIdentifier:(NS
 #ifdef DEBUG
     NSLog(@"URL:::: %@", rejectMeetInviteUrl);
     NSLog(@"URL:::: %@", userId);
+    NSLog(@"URL:::: %@", [action.callUUID.UUIDString lowercaseString]);
 #endif
     NSMutableURLRequest *request = [NSMutableURLRequest requestWithURL:[NSURL URLWithString: rejectMeetInviteUrl]];
 
@@ -959,6 +964,7 @@ RCT_EXPORT_METHOD(reportUpdatedCall:(NSString *)uuidString contactIdentifier:(NS
     NSURLResponse * response = nil;
     NSURLConnection *conn = [[NSURLConnection alloc] initWithRequest:request delegate:self];
     [NSURLConnection sendSynchronousRequest:request returningResponse:&response error:&error];
+
     if (error != nil) {
       NSLog(@"errore: %@", error);
     }
