@@ -933,9 +933,6 @@ RCT_EXPORT_METHOD(reportUpdatedCall:(NSString *)uuidString contactIdentifier:(NS
 #ifdef DEBUG
     NSLog(@"[RNCallKeep][CXProviderDelegate][provider:performEndCallAction]");
 #endif
-    [self sendEventWithNameWrapper:RNCallKeepPerformEndCallAction body:@{ @"callUUID": [action.callUUID.UUIDString lowercaseString] }];
-    [action fulfill];
-
     // Create the request.
     NSError *error = nil;
     NSUserDefaults *userDefaults = [NSUserDefaults standardUserDefaults];
@@ -952,7 +949,7 @@ RCT_EXPORT_METHOD(reportUpdatedCall:(NSString *)uuidString contactIdentifier:(NS
     request.HTTPMethod = @"POST";
 
     // Setting a timeout
-    request.timeoutInterval = 20.0;
+    request.timeoutInterval = 5.0;
     // This is how we set header fields
     [request setValue:@"application/json; charset=utf-8" forHTTPHeaderField:@"Content-Type"];
 
@@ -968,6 +965,9 @@ RCT_EXPORT_METHOD(reportUpdatedCall:(NSString *)uuidString contactIdentifier:(NS
     if (error != nil) {
       NSLog(@"errore: %@", error);
     }
+
+    [self sendEventWithNameWrapper:RNCallKeepPerformEndCallAction body:@{ @"callUUID": [action.callUUID.UUIDString lowercaseString] }];
+    [action fulfill];
 }
 
 -(void)provider:(CXProvider *)provider performSetHeldCallAction:(CXSetHeldCallAction *)action
