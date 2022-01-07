@@ -3,6 +3,7 @@ declare module 'react-native-callkeep' {
     'didReceiveStartCallAction' |
     'answerCall' |
     'endCall' |
+    'timeout' |
     'didActivateAudioSession' |
     'didDeactivateAudioSession' |
     'didDisplayIncomingCall' |

@@ -13,6 +13,7 @@ const RNCallKeepDidPerformSetMutedCallAction = 'RNCallKeepDidPerformSetMutedCall
 const RNCallKeepDidToggleHoldAction = 'RNCallKeepDidToggleHoldAction';
 const RNCallKeepDidPerformDTMFAction = 'RNCallKeepDidPerformDTMFAction';
 const RNCallKeepProviderReset = 'RNCallKeepProviderReset';
+const RNCallKeepTimeout = 'RNCallKeepTimeout';
 const RNCallKeepCheckReachability = 'RNCallKeepCheckReachability';
 const RNCallKeepDidLoadWithEvents = 'RNCallKeepDidLoadWithEvents';
 const RNCallKeepShowIncomingCallUi = 'RNCallKeepShowIncomingCallUi';
@@ -27,6 +28,9 @@ const didReceiveStartCallAction = handler => {
 
   return eventEmitter.addListener(RNCallKeepDidReceiveStartCallAction, (data) => handler(data));
 };
+
+const timeout = handler =>
+  eventEmitter.addListener(RNCallKeepTimeout, (data) => handler(data));
 
 const answerCall = handler =>
   eventEmitter.addListener(RNCallKeepPerformAnswerCallAction, (data) => handler(data));
@@ -82,6 +86,7 @@ export const listeners = {
   didReceiveStartCallAction,
   answerCall,
   endCall,
+  timeout,
   didActivateAudioSession,
   didDeactivateAudioSession,
   didDisplayIncomingCall,

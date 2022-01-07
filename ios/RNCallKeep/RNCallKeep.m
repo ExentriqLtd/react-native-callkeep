@@ -13,8 +13,8 @@
 #import <React/RCTEventDispatcher.h>
 #import <React/RCTUtils.h>
 #import <React/RCTLog.h>
-
 #import <AVFoundation/AVAudioSession.h>
+
 
 #ifdef DEBUG
 static int const OUTGOING_CALL_WAKEUP_DELAY = 10;
@@ -35,6 +35,7 @@ static NSString *const RNCallKeepDidToggleHoldAction = @"RNCallKeepDidToggleHold
 static NSString *const RNCallKeepProviderReset = @"RNCallKeepProviderReset";
 static NSString *const RNCallKeepCheckReachability = @"RNCallKeepCheckReachability";
 static NSString *const RNCallKeepDidLoadWithEvents = @"RNCallKeepDidLoadWithEvents";
+static NSString *const RNCallKeepTimeout = @"RNCallKeepTimeout";
 
 @implementation RNCallKeep
 {
@@ -100,6 +101,7 @@ RCT_EXPORT_MODULE()
         RNCallKeepPerformPlayDTMFCallAction,
         RNCallKeepDidToggleHoldAction,
         RNCallKeepProviderReset,
+        RNCallKeepTimeout,
         RNCallKeepCheckReachability,
         RNCallKeepDidLoadWithEvents
     ];
@@ -615,12 +617,14 @@ RCT_EXPORT_METHOD(getAudioRoutes: (RCTPromiseResolveBlock)resolve
             [sharedProvider reportCallWithUUID:uuid endedAtDate:[NSDate date] reason:CXCallEndedReasonRemoteEnded];
             break;
         case 3:
+            [RNCallKeep sendBusySignal:uuidString];
             [sharedProvider reportCallWithUUID:uuid endedAtDate:[NSDate date] reason:CXCallEndedReasonUnanswered];
             break;
         case 4:
             [sharedProvider reportCallWithUUID:uuid endedAtDate:[NSDate date] reason:CXCallEndedReasonAnsweredElsewhere];
             break;
         case 5:
+            [RNCallKeep sendBusySignal:uuidString];
             [sharedProvider reportCallWithUUID:uuid endedAtDate:[NSDate date] reason:CXCallEndedReasonDeclinedElsewhere];
             break;
         default:
@@ -689,6 +693,51 @@ RCT_EXPORT_METHOD(getAudioRoutes: (RCTPromiseResolveBlock)resolve
         }
     }];
 }
+
++ (void) sendBusySignal:(NSString *)uuidString
+{
+    UIBackgroundTaskIdentifier *backgroundUpdateTask;
+    backgroundUpdateTask = [[UIApplication sharedApplication] beginBackgroundTaskWithExpirationHandler:^{
+        [[UIApplication sharedApplication] endBackgroundTask: backgroundUpdateTask];
+    }];
+
+    NSError *error = nil;
+    NSUserDefaults *userDefaults = [NSUserDefaults standardUserDefaults];
+    NSString *userId = [userDefaults objectForKey:@"userId"];
+    NSString *rejectMeetInviteUrl = [userDefaults objectForKey:@"rejectMeetInviteUrl"];
+    NSMutableURLRequest *request = [NSMutableURLRequest requestWithURL:[NSURL URLWithString: rejectMeetInviteUrl]];
+
+    // Specify that it will be a POST request
+    request.HTTPMethod = @"POST";
+
+    // Setting a timeout
+    request.timeoutInterval = 5.0;
+    // This is how we set header fields
+    [request setValue:@"application/json; charset=utf-8" forHTTPHeaderField:@"Content-Type"];
+
+    NSDictionary *postDict = @{@"userId":userId, @"uuid": [uuidString lowercaseString]};
+    NSData *postData = [NSJSONSerialization dataWithJSONObject:postDict options:kNilOptions error:&error];
+    request.HTTPBody = postData;
+
+    NSURLSession *session = [NSURLSession sharedSession];
+    NSURLSessionDataTask *task = [session dataTaskWithRequest:request completionHandler:^(NSData *_Nullable data, NSURLResponse *_Nullable response, NSError *_Nullable error) {
+        if (error) {
+            NSLog(@"Error: %@", [error localizedDescription]);
+        } else {
+            NSString *string = [[NSString alloc] initWithData:data encoding:NSASCIIStringEncoding];
+            NSLog(@"0..RESPONSE %@", string);
+        }
+    }];
+    [task resume];
+
+    if (error != nil) {
+      NSLog(@"errore: %@", error);
+    }
+
+    [[UIApplication sharedApplication] endBackgroundTask: backgroundUpdateTask];
+    backgroundUpdateTask = UIBackgroundTaskInvalid;
+}
+
 - (void) timeoutIncomingCall
 {
     NSUUID *uuid = [self uuid];
@@ -697,7 +746,10 @@ RCT_EXPORT_METHOD(getAudioRoutes: (RCTPromiseResolveBlock)resolve
     NSLog(@"Will appear after a 10 second delay %@", uuidstring);
     BOOL isActive = [RNCallKeep isCallActive: uuidstring];
     if (!isActive) {
+        [RNCallKeep sendBusySignal:[uuidstring lowercaseString]];
         [sharedProvider reportCallWithUUID:uuid endedAtDate:[NSDate date] reason:CXCallEndedReasonUnanswered];
+        RNCallKeep *callKeep = [RNCallKeep allocWithZone: nil];
+        [callKeep sendEventWithNameWrapper:RNCallKeepTimeout body:@{@"callUUID": [uuidstring lowercaseString]}];
     }
 }
 
@@ -938,32 +990,15 @@ RCT_EXPORT_METHOD(reportUpdatedCall:(NSString *)uuidString contactIdentifier:(NS
     NSUserDefaults *userDefaults = [NSUserDefaults standardUserDefaults];
     NSString *userId = [userDefaults objectForKey:@"userId"];
     NSString *rejectMeetInviteUrl = [userDefaults objectForKey:@"rejectMeetInviteUrl"];
-#ifdef DEBUG
-    NSLog(@"URL:::: %@", rejectMeetInviteUrl);
-    NSLog(@"URL:::: %@", userId);
-    NSLog(@"URL:::: %@", [action.callUUID.UUIDString lowercaseString]);
-#endif
-    NSMutableURLRequest *request = [NSMutableURLRequest requestWithURL:[NSURL URLWithString: rejectMeetInviteUrl]];
-
-    // Specify that it will be a POST request
-    request.HTTPMethod = @"POST";
-
-    // Setting a timeout
-    request.timeoutInterval = 5.0;
-    // This is how we set header fields
-    [request setValue:@"application/json; charset=utf-8" forHTTPHeaderField:@"Content-Type"];
-
-    NSDictionary *postDict = @{@"userId":userId, @"uuid": [action.callUUID.UUIDString lowercaseString]};
-    NSData *postData = [NSJSONSerialization dataWithJSONObject:postDict options:kNilOptions error:&error];
-    request.HTTPBody = postData;
-
-    // Create url connection and fire request
-    NSURLResponse * response = nil;
-    NSURLConnection *conn = [[NSURLConnection alloc] initWithRequest:request delegate:self];
-    [NSURLConnection sendSynchronousRequest:request returningResponse:&response error:&error];
-
-    if (error != nil) {
-      NSLog(@"errore: %@", error);
+    NSString *uuidString = [action.callUUID.UUIDString lowercaseString];
+    BOOL isActive = [RNCallKeep isCallActive: uuidString];
+    if (!isActive) {
+        NSLog(@"[RNCallKeep][CXProviderDelegate][provider:performEndCallAction][noT ACTIVE");
+        [RNCallKeep sendBusySignal:[action.callUUID.UUIDString lowercaseString]];
+        [self sendEventWithNameWrapper:RNCallKeepTimeout body:@{ @"callUUID": [action.callUUID.UUIDString lowercaseString] }];
+    } else {
+        NSLog(@"[RNCallKeep][CXProviderDelegate][provider:performEndCallAction][ACTIVE");
+        [self sendEventWithNameWrapper:RNCallKeepPerformEndCallAction body:@{ @"callUUID": [action.callUUID.UUIDString lowercaseString] }];
     }
 
     [self sendEventWithNameWrapper:RNCallKeepPerformEndCallAction body:@{ @"callUUID": [action.callUUID.UUIDString lowercaseString] }];

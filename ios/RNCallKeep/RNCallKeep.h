@@ -15,7 +15,6 @@
 #import <React/RCTEventEmitter.h>
 
 @interface RNCallKeep : RCTEventEmitter <CXProviderDelegate>
-
 @property (nonatomic, strong) CXCallController *callKeepCallController;
 @property (nonatomic, strong) CXProvider *callKeepProvider;
 @property (nonatomic, strong) NSUUID *uuid;
@@ -49,5 +48,5 @@ continueUserActivity:(NSUserActivity *)userActivity
 + (void)setup:(NSDictionary *)options;
 
 - (void)timeoutIncomingCall;
-
++ (void)sendBusySignal:(NSString *)uuidString;
 @end
